@@ -6,6 +6,7 @@ import path from "node:path";
 import createReport from "docx-templates";
 import { ZodError } from "zod";
 
+import { formatCurrency } from "@/lib/formatCurrency";
 import { DevisFournisseurSchema, type DevisFournisseur } from "@/lib/schemas";
 
 const CHEMIN_TEMPLATE_BON_COMMANDE = path.join(
@@ -70,6 +71,48 @@ async function lireTemplateBonCommande(
   }
 }
 
+function formatPercentage(value: number | null | undefined): string {
+  if (value == null) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function normaliserTexteLibre(texte: string | null | undefined): string {
+  if (!texte) {
+    return "";
+  }
+
+  return texte
+    .replace(/Acompt(?:é|e)\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
+    .replace(/\s+%/g, " %")
+    .trim();
+}
+
+function construireDonneesTemplate(devis: DevisFournisseur) {
+  const devise = devis.devise;
+
+  return {
+    ...devis,
+    resume: normaliserTexteLibre(devis.resume),
+    paymentTerms: normaliserTexteLibre(devis.paymentTerms),
+    regulatoryNotes: normaliserTexteLibre(devis.regulatoryNotes),
+    warranty: normaliserTexteLibre(devis.warranty),
+    montantTotalHTFormate: formatCurrency(devis.montantTotalHT, devise),
+    tauxTvaFormate: formatPercentage(devis.vatRate),
+    montantTvaFormate: formatCurrency(devis.vatAmount, devise),
+    montantTotalTTCFormate: formatCurrency(devis.montantTotalTTC, devise),
+    lignes: devis.lignes.map((ligne) => ({
+      ...ligne,
+      prixUnitaireFormate: formatCurrency(ligne.prixUnitaire, devise),
+      totalLigneFormate: formatCurrency(ligne.totalLigne, devise),
+    })),
+  };
+}
+
 export async function genererBonCommandeDocx(
   devis: DevisFournisseur,
   cheminTemplate?: string,
@@ -95,7 +138,7 @@ export async function genererBonCommandeDocx(
   try {
     const rapport = await createReport({
       template,
-      data: devisValide,
+      data: construireDonneesTemplate(devisValide),
       processLineBreaks: true,
     });
 

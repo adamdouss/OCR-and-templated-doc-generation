@@ -11,6 +11,8 @@ describe("genererBonCommandeDocx", () => {
       dateDevis: "2026-05-10",
       validiteDevis: "30 jours",
       montantTotalHT: 100,
+      vatRate: 20,
+      vatAmount: 20,
       montantTotalTTC: 120,
       devise: "EUR",
       lignes: [
@@ -21,7 +23,12 @@ describe("genererBonCommandeDocx", () => {
           totalLigne: 100,
         },
       ],
-      resume: "Fournitures de bureau.",
+      resume: "Acompté de 30%",
+      paymentTerms:
+        "Acompte de 30 % a la commande — Solde a reception de facture",
+      regulatoryNotes:
+        "Travaux soumis a la norme NF C 15-100 et decret IRVE 2017",
+      warranty: "Garantie pieces et main d'oeuvre : 2 ans",
     });
 
     expect(resultat.nomFichier).toBe("bon-commande-DEV-2026-001.docx");

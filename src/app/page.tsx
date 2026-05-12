@@ -1,91 +1,385 @@
+"use client";
+
+import { useState } from "react";
+
+import { ExtractionPreview } from "@/components/ExtractionPreview";
+import {
+  StatusStepper,
+  type EtapePipeline,
+} from "@/components/StatusStepper";
+import { UploadZone } from "@/components/UploadZone";
+import type { DevisFournisseur } from "@/lib/schemas";
+
+const DEVIS_VIDE: DevisFournisseur = {
+  nomFournisseur: "",
+  nomClient: null,
+  numeroDevis: null,
+  dateDevis: null,
+  validiteDevis: null,
+  montantTotalHT: null,
+  vatRate: null,
+  vatAmount: null,
+  montantTotalTTC: null,
+  devise: "EUR",
+  lignes: [],
+  resume: null,
+  paymentTerms: null,
+  regulatoryNotes: null,
+  warranty: null,
+};
+
+function extraireMessageErreur(
+  erreur: unknown,
+  messageParDefaut: string,
+): string {
+  if (erreur instanceof Error && erreur.message) {
+    return erreur.message;
+  }
+
+  return messageParDefaut;
+}
+
+async function verifierReponseJson<T>(
+  reponse: Response,
+  messageParDefaut: string,
+): Promise<T> {
+  const donnees = (await reponse.json().catch(() => null)) as
+    | T
+    | { error?: string }
+    | null;
+
+  if (!reponse.ok) {
+    const messageErreur =
+      donnees && typeof donnees === "object" && "error" in donnees
+        ? donnees.error
+        : messageParDefaut;
+
+    throw new Error(messageErreur ?? messageParDefaut);
+  }
+
+  return donnees as T;
+}
+
 export default function Home() {
-  const backlog = [
-    "Configurer les routes API OCR, extraction et generation DOCX",
-    "Definir le schema devis fournisseur avec Zod",
-    "Brancher le SDK officiel Mistral cote serveur",
-    "Ajouter la previsualisation editable des donnees extraites",
-  ];
+  const [fichierSelectionne, setFichierSelectionne] = useState<File | null>(
+    null,
+  );
+  const [etape, setEtape] = useState<EtapePipeline>("idle");
+  const [texteOcr, setTexteOcr] = useState("");
+  const [devis, setDevis] = useState<DevisFournisseur | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [nomFichierGenere, setNomFichierGenere] = useState<string | null>(null);
+
+  const interfaceVerrouillee =
+    etape === "uploading" ||
+    etape === "ocr" ||
+    etape === "extracting" ||
+    etape === "generating";
+
+  const reinitialiserSorties = () => {
+    setEtape("idle");
+    setErreur(null);
+    setTexteOcr("");
+    setDevis(null);
+    setNomFichierGenere(null);
+  };
+
+  const gererChangementFichier = (file: File | null) => {
+    reinitialiserSorties();
+
+    if (!file) {
+      setFichierSelectionne(null);
+      return;
+    }
+
+    const estPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+
+    if (!estPdf) {
+      setFichierSelectionne(null);
+      setErreur("Veuillez selectionner un document PDF valide.");
+      setEtape("error");
+      return;
+    }
+
+    setFichierSelectionne(file);
+  };
+
+  const lancerAnalyse = async () => {
+    if (!fichierSelectionne) {
+      setErreur("Selectionnez d'abord un fichier PDF.");
+      setEtape("error");
+      return;
+    }
+
+    const estPdf =
+      fichierSelectionne.type === "application/pdf" ||
+      fichierSelectionne.name.toLowerCase().endsWith(".pdf");
+
+    if (!estPdf) {
+      setErreur("Le fichier choisi doit etre un PDF.");
+      setEtape("error");
+      return;
+    }
+
+    try {
+      setErreur(null);
+      setNomFichierGenere(null);
+      setEtape("uploading");
+
+      const formData = new FormData();
+      formData.append("file", fichierSelectionne);
+
+      setEtape("ocr");
+      const ocrResponse = await fetch("/api/ocr", {
+        body: formData,
+        method: "POST",
+      });
+      const ocrPayload = await verifierReponseJson<{ text: string }>(
+        ocrResponse,
+        "Le traitement OCR a echoue.",
+      );
+
+      setTexteOcr(ocrPayload.text);
+      setEtape("extracting");
+
+      const extractResponse = await fetch("/api/extract", {
+        body: JSON.stringify({ texteOcr: ocrPayload.text }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const extractPayload = await verifierReponseJson<{
+        devis: DevisFournisseur;
+      }>(extractResponse, "L'extraction des donnees a echoue.");
+
+      setDevis({
+        ...DEVIS_VIDE,
+        ...extractPayload.devis,
+        lignes: extractPayload.devis.lignes ?? [],
+      });
+      setEtape("ready");
+    } catch (error) {
+      setErreur(
+        extraireMessageErreur(
+          error,
+          "Une erreur est survenue pendant l'analyse du devis.",
+        ),
+      );
+      setEtape("error");
+    }
+  };
+
+  const genererDocx = async () => {
+    if (!devis) {
+      setErreur("Aucun devis n'est disponible pour la generation DOCX.");
+      setEtape("error");
+      return;
+    }
+
+    try {
+      setErreur(null);
+      setEtape("generating");
+
+      const response = await fetch("/api/generate-docx", {
+        body: JSON.stringify({ devis }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+
+        throw new Error(
+          payload?.error ??
+            "La generation du bon de commande a echoue.",
+        );
+      }
+
+      const blob = await response.blob();
+      const contenuDisposition = response.headers.get("content-disposition");
+      const nomFichier =
+        contenuDisposition?.match(/filename="([^"]+)"/)?.[1] ??
+        "bon-commande.docx";
+
+      const url = window.URL.createObjectURL(blob);
+      const lien = document.createElement("a");
+      lien.href = url;
+      lien.download = nomFichier;
+      document.body.appendChild(lien);
+      lien.click();
+      lien.remove();
+      window.URL.revokeObjectURL(url);
+
+      setNomFichierGenere(nomFichier);
+      setEtape("done");
+    } catch (error) {
+      setErreur(
+        extraireMessageErreur(
+          error,
+          "La generation du bon de commande a echoue.",
+        ),
+      );
+      setEtape("error");
+    }
+  };
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-6 py-10 lg:px-10">
-      <section className="grid gap-6 rounded-[2rem] border border-border bg-surface p-8 shadow-[0_30px_80px_rgba(78,55,33,0.08)] lg:grid-cols-[1.35fr_0.85fr] lg:p-10">
+    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-8 lg:px-10 lg:py-10">
+      <section className="grid gap-6 rounded-[2rem] border border-border bg-surface p-8 shadow-[0_30px_80px_rgba(78,55,33,0.08)] lg:grid-cols-[1.25fr_0.75fr] lg:p-10">
         <div className="space-y-6">
           <span className="inline-flex rounded-full border border-accent/20 bg-accent-soft px-4 py-2 text-sm font-medium text-accent">
-            MVP en cours de construction
+            MVP OCR-to-Report
           </span>
           <div className="space-y-4">
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              OCR-to-Report pour devis fournisseurs
+              Devis fournisseur vers bon de commande client
             </h1>
-            <p className="max-w-2xl text-lg leading-8 text-muted">
-              Le socle technique est pret. La prochaine etape est de brancher le
-              pipeline serveur pour transformer un PDF unique en donnees
-              structurees valides, puis en document DOCX telechargeable.
+            <p className="max-w-3xl text-lg leading-8 text-muted">
+              Uploadez un PDF, lancez l&apos;OCR Mistral, corrigez les donnees
+              extraites, puis telechargez un bon de commande DOCX pret a etre
+              partage.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-muted">
             <span className="rounded-full border border-border bg-white px-4 py-2">
-              Next.js 16
+              Mistral OCR
             </span>
             <span className="rounded-full border border-border bg-white px-4 py-2">
-              TypeScript strict
+              Extraction structuree
             </span>
             <span className="rounded-full border border-border bg-white px-4 py-2">
-              Tailwind v4
+              Correction manuelle
             </span>
             <span className="rounded-full border border-border bg-white px-4 py-2">
-              UI en francais
+              Export DOCX
             </span>
           </div>
         </div>
 
         <aside className="rounded-[1.5rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,243,227,0.95))] p-6">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted">
-            Prochaines taches
+            Resume session
           </p>
-          <ol className="mt-5 space-y-4">
-            {backlog.map((item, index) => (
-              <li
-                key={item}
-                className="flex gap-4 rounded-2xl border border-white/70 bg-white/80 p-4"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
-                  {index + 1}
-                </span>
-                <span className="text-sm leading-6 text-foreground">
-                  {item}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <dl className="mt-5 space-y-4 text-sm">
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4">
+              <dt className="font-medium text-muted">Fichier selectionne</dt>
+              <dd className="mt-2 text-base text-foreground">
+                {fichierSelectionne?.name ?? "Aucun PDF"}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4">
+              <dt className="font-medium text-muted">Texte OCR</dt>
+              <dd className="mt-2 text-base text-foreground">
+                {texteOcr ? `${texteOcr.length} caracteres` : "Pas encore lance"}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4">
+              <dt className="font-medium text-muted">Sortie generee</dt>
+              <dd className="mt-2 text-base text-foreground">
+                {nomFichierGenere ?? "Aucun DOCX telecharge"}
+              </dd>
+            </div>
+          </dl>
         </aside>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-[1.5rem] border border-border bg-surface p-6">
-          <p className="text-sm font-medium text-muted">Route OCR</p>
-          <h2 className="mt-3 text-xl font-semibold">PDF vers texte</h2>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            Upload unique en `FormData`, validation du type PDF, appel a
-            `mistral-ocr-latest`, normalisation de la reponse et erreurs
-            lisibles.
+      <StatusStepper etape={etape} />
+
+      <UploadZone
+        erreur={erreur}
+        estOccupe={interfaceVerrouillee}
+        fichierSelectionne={fichierSelectionne}
+        onFileChange={gererChangementFichier}
+      />
+
+      <section className="grid gap-4 rounded-[1.75rem] border border-border bg-surface p-6 md:grid-cols-[1.25fr_0.75fr]">
+        <div className="space-y-3">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted">
+            Pilotage
           </p>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Lancer l&apos;analyse ou exporter le resultat
+          </h2>
+          <p className="max-w-2xl text-sm leading-7 text-muted">
+            Le premier bouton lance l&apos;OCR puis l&apos;extraction. Une fois
+            le devis revu, le second bouton genere le bon de commande DOCX.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
+          <button
+            className="inline-flex items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!fichierSelectionne || interfaceVerrouillee}
+            onClick={lancerAnalyse}
+            type="button"
+          >
+            {interfaceVerrouillee && etape !== "generating"
+              ? "Analyse en cours..."
+              : "Lancer l'analyse"}
+          </button>
+          <button
+            className="inline-flex items-center justify-center rounded-full border border-border bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!devis || interfaceVerrouillee}
+            onClick={genererDocx}
+            type="button"
+          >
+            {etape === "generating"
+              ? "Generation en cours..."
+              : "Generer le bon de commande"}
+          </button>
+        </div>
+      </section>
+
+      {devis ? (
+        <ExtractionPreview
+          devis={devis}
+          estVerrouille={interfaceVerrouillee}
+          onChange={setDevis}
+        />
+      ) : (
+        <section className="rounded-[1.75rem] border border-dashed border-border bg-white/70 px-6 py-10 text-center">
+          <p className="text-lg font-medium text-foreground">
+            Aucune donnee extraite pour le moment.
+          </p>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Selectionnez un PDF puis lancez l&apos;analyse pour afficher le
+            devis editable ici.
+          </p>
+        </section>
+      )}
+
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <article className="rounded-[1.5rem] border border-border bg-surface p-6">
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted">
+            Apercu OCR
+          </p>
+          <textarea
+            className="mt-4 min-h-64 w-full rounded-[1.25rem] border border-border bg-white px-4 py-3 text-sm leading-7 text-foreground outline-none"
+            readOnly
+            value={texteOcr}
+          />
         </article>
+
         <article className="rounded-[1.5rem] border border-border bg-surface p-6">
-          <p className="text-sm font-medium text-muted">Extraction</p>
-          <h2 className="mt-3 text-xl font-semibold">Texte vers JSON metier</h2>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            Prompt structure en francais, sortie JSON stricte, validation Zod et
-            remontee d erreurs metier exploitables par l interface.
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-muted">
+            Aide d&apos;usage
           </p>
-        </article>
-        <article className="rounded-[1.5rem] border border-border bg-surface p-6">
-          <p className="text-sm font-medium text-muted">Generation DOCX</p>
-          <h2 className="mt-3 text-xl font-semibold">JSON vers livrable</h2>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            Template Word simple, injection des champs devis et telechargement
-            du bon de commande final depuis le navigateur.
-          </p>
+          <div className="mt-4 space-y-4 text-sm leading-7 text-muted">
+            <p>
+              Si un champ est mal extrait, corrigez-le directement dans le
+              panneau principal avant l&apos;export.
+            </p>
+            <p>
+              Les lignes de devis peuvent etre ajoutees, supprimees ou
+              modifiees manuellement.
+            </p>
+            <p>
+              Le DOCX est telecharge automatiquement a la fin de la generation.
+            </p>
+          </div>
         </article>
       </section>
     </main>

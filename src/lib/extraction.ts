@@ -19,6 +19,24 @@ If a field is missing, return null.
 For numeric amounts, return numbers only, without currency symbols.
 
 The document is expected to be a supplier quote or estimate, not an invoice.
+
+Extract these structured fields when available:
+- supplier name
+- client name
+- quote number
+- quote date
+- quote validity
+- total before tax
+- VAT rate in percent
+- VAT amount
+- total including tax
+- payment terms
+- regulatory notes
+- warranty
+- free summary
+- line items
+
+For VAT rate, return only the numeric value, for example 20 for 20%.
 `.trim();
 
 const MARQUEURS_DEVIS_FOURNISSEUR = [
@@ -102,6 +120,68 @@ export function ressembleAUnDevisFournisseur(texteOcr: string): boolean {
   );
 }
 
+function normaliserTexteLibre(texte: string | null | undefined): string | null {
+  if (!texte) {
+    return null;
+  }
+
+  return texte
+    .replace(/Acompt(?:é|e)\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
+    .replace(/\s+%/g, " %")
+    .trim();
+}
+
+function construireResumeDevis(devis: DevisFournisseur): string | null {
+  const resumeExistant = normaliserTexteLibre(devis.resume);
+  if (resumeExistant) {
+    return resumeExistant;
+  }
+
+  const segments: string[] = [];
+
+  if (devis.nomFournisseur) {
+    segments.push(`Devis fournisseur ${devis.nomFournisseur}.`);
+  }
+
+  if (devis.lignes.length > 0) {
+    const descriptions = devis.lignes
+      .map((ligne) => ligne.description.trim())
+      .filter((description) => description.length > 0)
+      .slice(0, 3);
+
+    if (descriptions.length > 0) {
+      segments.push(`Prestations principales : ${descriptions.join(", ")}.`);
+    }
+  }
+
+  if (devis.montantTotalHT != null && devis.montantTotalTTC != null) {
+    segments.push(
+      `Montants extraits : ${devis.montantTotalHT} HT et ${devis.montantTotalTTC} TTC.`,
+    );
+  } else if (devis.montantTotalTTC != null) {
+    segments.push(`Montant total TTC extrait : ${devis.montantTotalTTC}.`);
+  }
+
+  const conditionsPaiement = normaliserTexteLibre(devis.paymentTerms);
+  if (conditionsPaiement) {
+    segments.push(conditionsPaiement.endsWith(".") ? conditionsPaiement : `${conditionsPaiement}.`);
+  }
+
+  return segments.length > 0 ? segments.join(" ") : null;
+}
+
+function normaliserDevisFournisseur(
+  devis: DevisFournisseur,
+): DevisFournisseur {
+  return {
+    ...devis,
+    resume: construireResumeDevis(devis),
+    paymentTerms: normaliserTexteLibre(devis.paymentTerms),
+    regulatoryNotes: normaliserTexteLibre(devis.regulatoryNotes),
+    warranty: normaliserTexteLibre(devis.warranty),
+  };
+}
+
 export function parserDevisFournisseurDepuisMessageChat(
   contenu: string,
 ): DevisFournisseur {
@@ -118,7 +198,7 @@ export function parserDevisFournisseurDepuisMessageChat(
   }
 
   try {
-    return DevisFournisseurSchema.parse(chargeUtile);
+    return normaliserDevisFournisseur(DevisFournisseurSchema.parse(chargeUtile));
   } catch (error) {
     if (error instanceof ZodError) {
       throw new ExtractionError(

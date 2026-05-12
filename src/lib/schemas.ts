@@ -14,10 +14,15 @@ export const DevisFournisseurSchema = z.object({
   dateDevis: z.string().trim().nullable().optional(),
   validiteDevis: z.string().trim().nullable().optional(),
   montantTotalHT: z.number().nullable().optional(),
+  vatRate: z.number().nullable().optional(),
+  vatAmount: z.number().nullable().optional(),
   montantTotalTTC: z.number().nullable().optional(),
   devise: z.string().trim().min(1).default("EUR"),
   lignes: z.array(LigneDevisFournisseurSchema).default([]),
   resume: z.string().trim().nullable().optional(),
+  paymentTerms: z.string().trim().nullable().optional(),
+  regulatoryNotes: z.string().trim().nullable().optional(),
+  warranty: z.string().trim().nullable().optional(),
 });
 
 export const RequeteExtractionDevisSchema = z.object({

@@ -17,15 +17,22 @@ describe("parserDevisFournisseurDepuisMessageChat", () => {
         "dateDevis": "2026-05-10",
         "validiteDevis": "30 jours",
         "montantTotalHT": 100,
+        "vatRate": 20,
+        "vatAmount": 20,
         "montantTotalTTC": 120,
         "devise": "EUR",
         "lignes": [],
-        "resume": "Devis de test"
+        "resume": "Acompté de 30% a la commande",
+        "paymentTerms": "Acompté de 30% a la commande",
+        "regulatoryNotes": "Norme NF C 15-100",
+        "warranty": "Garantie 2 ans"
       }
     `);
 
     expect(devis.nomFournisseur).toBe("ACME Fournitures");
     expect(devis.montantTotalTTC).toBe(120);
+    expect(devis.vatRate).toBe(20);
+    expect(devis.resume).toBe("Acompte de 30 % a la commande");
   });
 
   it("leve une erreur propre pour un JSON invalide", () => {
@@ -51,10 +58,15 @@ describe("parserDevisFournisseurDepuisMessageChat", () => {
           "dateDevis": null,
           "validiteDevis": null,
           "montantTotalHT": null,
+          "vatRate": null,
+          "vatAmount": null,
           "montantTotalTTC": null,
           "devise": "EUR",
           "lignes": [],
-          "resume": null
+          "resume": null,
+          "paymentTerms": null,
+          "regulatoryNotes": null,
+          "warranty": null
         }
       `),
     ).toThrowError(ExtractionError);
@@ -68,10 +80,15 @@ describe("parserDevisFournisseurDepuisMessageChat", () => {
           "dateDevis": null,
           "validiteDevis": null,
           "montantTotalHT": null,
+          "vatRate": null,
+          "vatAmount": null,
           "montantTotalTTC": null,
           "devise": "EUR",
           "lignes": [],
-          "resume": null
+          "resume": null,
+          "paymentTerms": null,
+          "regulatoryNotes": null,
+          "warranty": null
         }
       `);
     } catch (error) {
@@ -116,10 +133,15 @@ describe("extraireDonneesDevisFournisseur", () => {
               dateDevis: "2026-05-10",
               validiteDevis: "30 jours",
               montantTotalHT: 100,
+              vatRate: 20,
+              vatAmount: 20,
               montantTotalTTC: 120,
               devise: "EUR",
               lignes: [],
               resume: "Devis de test",
+              paymentTerms: "Acompte de 30 % a la commande",
+              regulatoryNotes: "Norme NF C 15-100",
+              warranty: "Garantie 2 ans",
             }),
           },
         },
@@ -132,6 +154,49 @@ describe("extraireDonneesDevisFournisseur", () => {
 
     expect(parse).toHaveBeenCalledOnce();
     expect(devis.nomFournisseur).toBe("ACME Fournitures");
+  });
+
+  it("genere un resume de secours quand le LLM le laisse vide", async () => {
+    const parse = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              nomFournisseur: "ACME Fournitures",
+              nomClient: "Concordia",
+              numeroDevis: "DEV-2026-001",
+              dateDevis: "2026-05-10",
+              validiteDevis: "30 jours",
+              montantTotalHT: 100,
+              vatRate: 20,
+              vatAmount: 20,
+              montantTotalTTC: 120,
+              devise: "EUR",
+              lignes: [
+                {
+                  description: "Papier A4",
+                  quantite: 10,
+                  prixUnitaire: 10,
+                  totalLigne: 100,
+                },
+              ],
+              resume: null,
+              paymentTerms: "Acompte de 30 % a la commande",
+              regulatoryNotes: null,
+              warranty: null,
+            }),
+          },
+        },
+      ],
+    });
+
+    const devis = await extraireDonneesDevisFournisseur("DEVIS\nOCR text", {
+      parse,
+    });
+
+    expect(devis.resume).toContain("Devis fournisseur ACME Fournitures.");
+    expect(devis.resume).toContain("Prestations principales : Papier A4.");
+    expect(devis.resume).toContain("Montants extraits : 100 HT et 120 TTC.");
   });
 
   it("rejette un texte OCR vide avant l'appel Mistral", async () => {
