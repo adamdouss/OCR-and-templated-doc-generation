@@ -2,11 +2,23 @@ import { NextResponse } from "next/server";
 
 import { OcrError, extractTextFromPdf } from "@/lib/ocr";
 
+function estUnFichierTeleverse(valeur: FormDataEntryValue | null): valeur is File {
+  if (!valeur || typeof valeur === "string") {
+    return false;
+  }
+
+  return (
+    typeof valeur.arrayBuffer === "function" &&
+    typeof valeur.name === "string" &&
+    typeof valeur.type === "string"
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const fileEntry = formData.get("file");
-    const file = fileEntry instanceof File ? fileEntry : null;
+    const file = estUnFichierTeleverse(fileEntry) ? fileEntry : null;
 
     const text = await extractTextFromPdf(file);
 
@@ -22,6 +34,8 @@ export async function POST(request: Request) {
         { status: error.status },
       );
     }
+
+    console.error("OCR route unexpected error", error);
 
     return NextResponse.json(
       {

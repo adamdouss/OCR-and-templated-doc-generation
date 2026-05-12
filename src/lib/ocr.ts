@@ -1,11 +1,19 @@
 import "server-only";
 
+import { Buffer } from "node:buffer";
+
 import type { OCRResponse } from "@mistralai/mistralai/models/components";
 
 import { getMistralClient } from "@/lib/mistral";
 
 const OCR_MODEL = "mistral-ocr-latest";
 const PDF_MIME_TYPE = "application/pdf";
+
+export type FichierPdfTeleverse = {
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  name: string;
+  type: string;
+};
 
 type OcrFailureCode =
   | "MISSING_FILE"
@@ -38,9 +46,12 @@ export class OcrError extends Error {
 type OcrClient = {
   files: {
     upload: (request: {
-      file: File;
-      purpose: "ocr";
-    }) => Promise<{ id: string }>;
+      file: {
+        fileName: string;
+    content: Uint8Array;
+      };
+    purpose: "ocr";
+  }) => Promise<{ id: string }>;
     delete: (request: { fileId: string }) => Promise<unknown>;
   };
   ocr: {
@@ -52,7 +63,7 @@ type OcrClient = {
   };
 };
 
-export function isPdfFile(file: File): boolean {
+export function isPdfFile(file: FichierPdfTeleverse): boolean {
   if (file.type === PDF_MIME_TYPE) {
     return true;
   }
@@ -77,8 +88,20 @@ export function normalizeOcrResponse(response: OCRResponse): string {
   return text;
 }
 
+async function convertFileForMistral(file: FichierPdfTeleverse): Promise<{
+  fileName: string;
+  content: Uint8Array;
+}> {
+  const arrayBuffer = await file.arrayBuffer();
+
+  return {
+    fileName: file.name,
+    content: Buffer.from(arrayBuffer),
+  };
+}
+
 export async function extractTextFromPdf(
-  file: File | null,
+  file: FichierPdfTeleverse | null,
   client?: OcrClient,
 ): Promise<string> {
   if (!file) {
@@ -102,8 +125,9 @@ export async function extractTextFromPdf(
   let uploadedFileId: string | undefined;
 
   try {
+    const uploadedPayload = await convertFileForMistral(file);
     const uploadedFile = await activeClient.files.upload({
-      file,
+      file: uploadedPayload,
       purpose: "ocr",
     });
     uploadedFileId = uploadedFile.id;

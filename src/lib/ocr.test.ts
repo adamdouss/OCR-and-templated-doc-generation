@@ -125,6 +125,13 @@ describe("extractTextFromPdf", () => {
 
     expect(text).toBe("Devis fournisseur");
     expect(upload).toHaveBeenCalledOnce();
+    expect(upload).toHaveBeenCalledWith({
+      file: {
+        fileName: "quote.pdf",
+        content: expect.any(Uint8Array),
+      },
+      purpose: "ocr",
+    });
     expect(process).toHaveBeenCalledWith({
       model: "mistral-ocr-latest",
       document: {
