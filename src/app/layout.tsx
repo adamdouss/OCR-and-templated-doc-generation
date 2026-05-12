@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OCR-to-Report",
-  description: "Extraction OCR de factures fournisseurs et generation de syntheses DOCX.",
+  description:
+    "Extraction OCR de factures fournisseurs et generation de syntheses DOCX.",
 };
 
 export default function RootLayout({

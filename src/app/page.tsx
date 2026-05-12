@@ -52,7 +52,9 @@ export default function Home() {
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
                   {index + 1}
                 </span>
-                <span className="text-sm leading-6 text-foreground">{item}</span>
+                <span className="text-sm leading-6 text-foreground">
+                  {item}
+                </span>
               </li>
             ))}
           </ol>
@@ -65,7 +67,8 @@ export default function Home() {
           <h2 className="mt-3 text-xl font-semibold">PDF vers texte</h2>
           <p className="mt-3 text-sm leading-7 text-muted">
             Upload unique en `FormData`, validation du type PDF, appel a
-            `mistral-ocr-latest`, normalisation de la reponse et erreurs lisibles.
+            `mistral-ocr-latest`, normalisation de la reponse et erreurs
+            lisibles.
           </p>
         </article>
         <article className="rounded-[1.5rem] border border-border bg-surface p-6">
