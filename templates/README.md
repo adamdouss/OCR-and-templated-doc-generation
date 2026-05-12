@@ -4,4 +4,4 @@ Add the Word template file here.
 
 Expected file:
 
-- `invoice-summary-template.docx`
+- `purchase-order-template.docx`

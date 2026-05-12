@@ -9,7 +9,7 @@ import {
 
 describe("isPdfFile", () => {
   it("accepts the PDF mime type", () => {
-    const file = new File(["hello"], "invoice.bin", {
+    const file = new File(["hello"], "quote.bin", {
       type: "application/pdf",
     });
 
@@ -17,13 +17,13 @@ describe("isPdfFile", () => {
   });
 
   it("accepts a .pdf extension when mime type is empty", () => {
-    const file = new File(["hello"], "invoice.pdf", { type: "" });
+    const file = new File(["hello"], "quote.pdf", { type: "" });
 
     expect(isPdfFile(file)).toBe(true);
   });
 
   it("rejects non-pdf files", () => {
-    const file = new File(["hello"], "invoice.txt", { type: "text/plain" });
+    const file = new File(["hello"], "quote.txt", { type: "text/plain" });
 
     expect(isPdfFile(file)).toBe(false);
   });
@@ -85,7 +85,7 @@ describe("extractTextFromPdf", () => {
   });
 
   it("rejects non-pdf files", async () => {
-    const file = new File(["hello"], "invoice.txt", { type: "text/plain" });
+    const file = new File(["hello"], "quote.txt", { type: "text/plain" });
 
     await expect(extractTextFromPdf(file)).rejects.toMatchObject({
       code: "INVALID_FILE_TYPE",
@@ -100,7 +100,7 @@ describe("extractTextFromPdf", () => {
       pages: [
         {
           index: 0,
-          markdown: "Facture fournisseur",
+          markdown: "Devis fournisseur",
           images: [],
           dimensions: null,
         },
@@ -111,7 +111,7 @@ describe("extractTextFromPdf", () => {
       },
     });
 
-    const file = new File(["pdf"], "invoice.pdf", { type: "application/pdf" });
+    const file = new File(["pdf"], "quote.pdf", { type: "application/pdf" });
 
     const text = await extractTextFromPdf(file, {
       files: {
@@ -123,7 +123,7 @@ describe("extractTextFromPdf", () => {
       },
     });
 
-    expect(text).toBe("Facture fournisseur");
+    expect(text).toBe("Devis fournisseur");
     expect(upload).toHaveBeenCalledOnce();
     expect(process).toHaveBeenCalledWith({
       model: "mistral-ocr-latest",

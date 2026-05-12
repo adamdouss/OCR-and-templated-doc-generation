@@ -79,7 +79,7 @@ export function normalizeOcrResponse(response: OCRResponse): string {
 
 export async function extractTextFromPdf(
   file: File | null,
-  client: OcrClient = getMistralClient(),
+  client?: OcrClient,
 ): Promise<string> {
   if (!file) {
     throw new OcrError("MISSING_FILE", "Aucun fichier PDF n'a ete fourni.", {
@@ -98,16 +98,17 @@ export async function extractTextFromPdf(
     );
   }
 
+  const activeClient = client ?? getMistralClient();
   let uploadedFileId: string | undefined;
 
   try {
-    const uploadedFile = await client.files.upload({
+    const uploadedFile = await activeClient.files.upload({
       file,
       purpose: "ocr",
     });
     uploadedFileId = uploadedFile.id;
 
-    const response = await client.ocr.process({
+    const response = await activeClient.ocr.process({
       model: OCR_MODEL,
       document: {
         type: "file",
@@ -129,7 +130,7 @@ export async function extractTextFromPdf(
   } finally {
     if (uploadedFileId) {
       try {
-        await client.files.delete({ fileId: uploadedFileId });
+        await activeClient.files.delete({ fileId: uploadedFileId });
       } catch {
         // Best-effort cleanup only. OCR result has already been computed.
       }

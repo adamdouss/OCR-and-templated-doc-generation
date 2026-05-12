@@ -3,36 +3,46 @@ import "server-only";
 import { ZodError } from "zod";
 
 import { getMistralClient } from "@/lib/mistral";
-import { InvoiceSchema, type InvoiceData } from "@/lib/schemas";
+import { DevisFournisseurSchema, type DevisFournisseur } from "@/lib/schemas";
 
-const EXTRACTION_MODEL = "mistral-small-latest";
+const MODELE_EXTRACTION = "mistral-small-latest";
 
-const EXTRACTION_SYSTEM_PROMPT = `
-You are an information extraction assistant specialized in supplier invoices.
+const PROMPT_SYSTEME_EXTRACTION = `
+You are an information extraction assistant specialized in supplier quotes.
 
-Extract structured invoice data from the OCR text provided by the user.
+Extract structured supplier quote data from the OCR text provided by the user.
 
 Return only valid JSON.
 Do not include explanations.
 Do not include Markdown.
 If a field is missing, return null.
 For numeric amounts, return numbers only, without currency symbols.
+
+The document is expected to be a supplier quote or estimate, not an invoice.
 `.trim();
 
-type ExtractionFailureCode =
+const MARQUEURS_DEVIS_FOURNISSEUR = [
+  "devis",
+  "quote",
+  "estimate",
+  "validite du devis",
+];
+
+type CodeErreurExtraction =
   | "MISSING_OCR_TEXT"
+  | "UNSUPPORTED_DOCUMENT_TYPE"
   | "EMPTY_LLM_RESPONSE"
   | "INVALID_JSON"
   | "SCHEMA_VALIDATION_FAILED"
   | "MISTRAL_API_ERROR";
 
 export class ExtractionError extends Error {
-  readonly code: ExtractionFailureCode;
+  readonly code: CodeErreurExtraction;
   readonly status: number;
   readonly details?: unknown;
 
   constructor(
-    code: ExtractionFailureCode,
+    code: CodeErreurExtraction,
     message: string,
     options?: {
       cause?: unknown;
@@ -48,11 +58,11 @@ export class ExtractionError extends Error {
   }
 }
 
-type ChatParser = {
+type AnalyseurChat = {
   parse: (request: {
     model: string;
     messages: Array<{ role: "system" | "user"; content: string }>;
-    responseFormat: typeof InvoiceSchema;
+    responseFormat: typeof DevisFournisseurSchema;
   }) => Promise<{
     choices?: Array<{
       message?: {
@@ -62,12 +72,19 @@ type ChatParser = {
   }>;
 };
 
-function getAssistantContent(
-  response: Awaited<ReturnType<ChatParser["parse"]>>,
-): string {
-  const content = response.choices?.[0]?.message?.content;
+function normaliserTextePourDetection(texte: string): string {
+  return texte
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
 
-  if (!content || Array.isArray(content)) {
+function extraireContenuAssistant(
+  reponse: Awaited<ReturnType<AnalyseurChat["parse"]>>,
+): string {
+  const contenu = reponse.choices?.[0]?.message?.content;
+
+  if (!contenu || Array.isArray(contenu)) {
     throw new ExtractionError(
       "EMPTY_LLM_RESPONSE",
       "La reponse du modele d'extraction est vide.",
@@ -75,14 +92,23 @@ function getAssistantContent(
     );
   }
 
-  return content;
+  return contenu;
 }
 
-export function parseInvoiceFromChatMessage(content: string): InvoiceData {
-  let payload: unknown;
+export function ressembleAUnDevisFournisseur(texteOcr: string): boolean {
+  const texteNormalise = normaliserTextePourDetection(texteOcr);
+  return MARQUEURS_DEVIS_FOURNISSEUR.some((marqueur) =>
+    texteNormalise.includes(marqueur),
+  );
+}
+
+export function parserDevisFournisseurDepuisMessageChat(
+  contenu: string,
+): DevisFournisseur {
+  let chargeUtile: unknown;
 
   try {
-    payload = JSON.parse(content);
+    chargeUtile = JSON.parse(contenu);
   } catch (error) {
     throw new ExtractionError(
       "INVALID_JSON",
@@ -92,12 +118,12 @@ export function parseInvoiceFromChatMessage(content: string): InvoiceData {
   }
 
   try {
-    return InvoiceSchema.parse(payload);
+    return DevisFournisseurSchema.parse(chargeUtile);
   } catch (error) {
     if (error instanceof ZodError) {
       throw new ExtractionError(
         "SCHEMA_VALIDATION_FAILED",
-        "Les donnees extraites ne respectent pas le schema facture.",
+        "Les donnees extraites ne respectent pas le schema devis.",
         { cause: error, details: error.flatten(), status: 422 },
       );
     }
@@ -106,28 +132,37 @@ export function parseInvoiceFromChatMessage(content: string): InvoiceData {
   }
 }
 
-export async function extractInvoiceData(
-  ocrText: string,
-  parser: ChatParser = getMistralClient().chat,
-): Promise<InvoiceData> {
-  const trimmedText = ocrText.trim();
+export async function extraireDonneesDevisFournisseur(
+  texteOcr: string,
+  analyseur?: AnalyseurChat,
+): Promise<DevisFournisseur> {
+  const texteOcrNettoye = texteOcr.trim();
 
-  if (!trimmedText) {
+  if (!texteOcrNettoye) {
     throw new ExtractionError("MISSING_OCR_TEXT", "Le texte OCR est absent.", {
       status: 400,
     });
   }
 
-  let response: Awaited<ReturnType<ChatParser["parse"]>>;
+  if (!ressembleAUnDevisFournisseur(texteOcrNettoye)) {
+    throw new ExtractionError(
+      "UNSUPPORTED_DOCUMENT_TYPE",
+      "Le document ne ressemble pas a un devis fournisseur.",
+      { status: 422 },
+    );
+  }
+
+  const analyseurActif = analyseur ?? getMistralClient().chat;
+  let reponse: Awaited<ReturnType<AnalyseurChat["parse"]>>;
 
   try {
-    response = await parser.parse({
-      model: EXTRACTION_MODEL,
+    reponse = await analyseurActif.parse({
+      model: MODELE_EXTRACTION,
       messages: [
-        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-        { role: "user", content: trimmedText },
+        { role: "system", content: PROMPT_SYSTEME_EXTRACTION },
+        { role: "user", content: texteOcrNettoye },
       ],
-      responseFormat: InvoiceSchema,
+      responseFormat: DevisFournisseurSchema,
     });
   } catch (error) {
     throw new ExtractionError(
@@ -137,5 +172,7 @@ export async function extractInvoiceData(
     );
   }
 
-  return parseInvoiceFromChatMessage(getAssistantContent(response));
+  return parserDevisFournisseurDepuisMessageChat(
+    extraireContenuAssistant(reponse),
+  );
 }

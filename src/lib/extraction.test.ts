@@ -2,72 +2,76 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ExtractionError,
-  extractInvoiceData,
-  parseInvoiceFromChatMessage,
+  extraireDonneesDevisFournisseur,
+  parserDevisFournisseurDepuisMessageChat,
+  ressembleAUnDevisFournisseur,
 } from "@/lib/extraction";
 
-describe("parseInvoiceFromChatMessage", () => {
-  it("parses valid JSON into invoice data", () => {
-    const invoice = parseInvoiceFromChatMessage(`
+describe("parserDevisFournisseurDepuisMessageChat", () => {
+  it("parse un JSON valide en devis fournisseur", () => {
+    const devis = parserDevisFournisseurDepuisMessageChat(`
       {
-        "supplierName": "ACME Fournitures",
-        "invoiceNumber": "FAC-2026-001",
-        "invoiceDate": "2026-05-10",
-        "dueDate": "2026-06-10",
-        "totalHT": 100,
-        "totalTTC": 120,
-        "currency": "EUR",
-        "lineItems": [],
-        "summary": "Facture de test"
+        "nomFournisseur": "ACME Fournitures",
+        "nomClient": "Concordia",
+        "numeroDevis": "DEV-2026-001",
+        "dateDevis": "2026-05-10",
+        "validiteDevis": "30 jours",
+        "montantTotalHT": 100,
+        "montantTotalTTC": 120,
+        "devise": "EUR",
+        "lignes": [],
+        "resume": "Devis de test"
       }
     `);
 
-    expect(invoice.supplierName).toBe("ACME Fournitures");
-    expect(invoice.totalTTC).toBe(120);
+    expect(devis.nomFournisseur).toBe("ACME Fournitures");
+    expect(devis.montantTotalTTC).toBe(120);
   });
 
-  it("throws a clean error for invalid JSON", () => {
-    expect(() => parseInvoiceFromChatMessage("{invalid-json")).toThrowError(
-      ExtractionError,
-    );
+  it("leve une erreur propre pour un JSON invalide", () => {
+    expect(() =>
+      parserDevisFournisseurDepuisMessageChat("{invalid-json"),
+    ).toThrowError(ExtractionError);
 
     try {
-      parseInvoiceFromChatMessage("{invalid-json");
+      parserDevisFournisseurDepuisMessageChat("{invalid-json");
     } catch (error) {
       expect(error).toBeInstanceOf(ExtractionError);
       expect((error as ExtractionError).code).toBe("INVALID_JSON");
     }
   });
 
-  it("throws a clean error for schema validation failures", () => {
+  it("leve une erreur propre pour un schema invalide", () => {
     expect(() =>
-      parseInvoiceFromChatMessage(`
+      parserDevisFournisseurDepuisMessageChat(`
         {
-          "supplierName": "",
-          "invoiceNumber": null,
-          "invoiceDate": null,
-          "dueDate": null,
-          "totalHT": null,
-          "totalTTC": null,
-          "currency": "EUR",
-          "lineItems": [],
-          "summary": null
+          "nomFournisseur": "",
+          "nomClient": null,
+          "numeroDevis": null,
+          "dateDevis": null,
+          "validiteDevis": null,
+          "montantTotalHT": null,
+          "montantTotalTTC": null,
+          "devise": "EUR",
+          "lignes": [],
+          "resume": null
         }
       `),
     ).toThrowError(ExtractionError);
 
     try {
-      parseInvoiceFromChatMessage(`
+      parserDevisFournisseurDepuisMessageChat(`
         {
-          "supplierName": "",
-          "invoiceNumber": null,
-          "invoiceDate": null,
-          "dueDate": null,
-          "totalHT": null,
-          "totalTTC": null,
-          "currency": "EUR",
-          "lineItems": [],
-          "summary": null
+          "nomFournisseur": "",
+          "nomClient": null,
+          "numeroDevis": null,
+          "dateDevis": null,
+          "validiteDevis": null,
+          "montantTotalHT": null,
+          "montantTotalTTC": null,
+          "devise": "EUR",
+          "lignes": [],
+          "resume": null
         }
       `);
     } catch (error) {
@@ -77,39 +81,80 @@ describe("parseInvoiceFromChatMessage", () => {
   });
 });
 
-describe("extractInvoiceData", () => {
-  it("uses the chat parser and returns validated data", async () => {
+describe("ressembleAUnDevisFournisseur", () => {
+  it("detecte les marqueurs de devis dans le texte OCR", () => {
+    expect(
+      ressembleAUnDevisFournisseur("DEVIS\nValidité du devis : 1 mois"),
+    ).toBe(true);
+  });
+
+  it("reste robuste aux accents", () => {
+    expect(
+      ressembleAUnDevisFournisseur("DEVIS\nValidite du devis : 1 mois"),
+    ).toBe(true);
+  });
+
+  it("rejette un texte sans marqueurs de devis", () => {
+    expect(
+      ressembleAUnDevisFournisseur(
+        "FACTURE\nDate : 2026-05-10\nEcheance : 30 jours",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("extraireDonneesDevisFournisseur", () => {
+  it("utilise l'analyseur et renvoie un devis valide", async () => {
     const parse = vi.fn().mockResolvedValue({
       choices: [
         {
           message: {
             content: JSON.stringify({
-              supplierName: "ACME Fournitures",
-              invoiceNumber: "FAC-2026-001",
-              invoiceDate: "2026-05-10",
-              dueDate: "2026-06-10",
-              totalHT: 100,
-              totalTTC: 120,
-              currency: "EUR",
-              lineItems: [],
-              summary: "Facture de test",
+              nomFournisseur: "ACME Fournitures",
+              nomClient: "Concordia",
+              numeroDevis: "DEV-2026-001",
+              dateDevis: "2026-05-10",
+              validiteDevis: "30 jours",
+              montantTotalHT: 100,
+              montantTotalTTC: 120,
+              devise: "EUR",
+              lignes: [],
+              resume: "Devis de test",
             }),
           },
         },
       ],
     });
 
-    const invoice = await extractInvoiceData("OCR text", { parse });
+    const devis = await extraireDonneesDevisFournisseur("DEVIS\nOCR text", {
+      parse,
+    });
 
     expect(parse).toHaveBeenCalledOnce();
-    expect(invoice.supplierName).toBe("ACME Fournitures");
+    expect(devis.nomFournisseur).toBe("ACME Fournitures");
   });
 
-  it("rejects missing OCR text before calling Mistral", async () => {
+  it("rejette un texte OCR vide avant l'appel Mistral", async () => {
     const parse = vi.fn();
 
-    await expect(extractInvoiceData("   ", { parse })).rejects.toMatchObject({
+    await expect(
+      extraireDonneesDevisFournisseur("   ", { parse }),
+    ).rejects.toMatchObject({
       code: "MISSING_OCR_TEXT",
+    });
+
+    expect(parse).not.toHaveBeenCalled();
+  });
+
+  it("rejette un document hors perimetre avant l'appel Mistral", async () => {
+    const parse = vi.fn();
+
+    await expect(
+      extraireDonneesDevisFournisseur("FACTURE\nPaiement sous 30 jours", {
+        parse,
+      }),
+    ).rejects.toMatchObject({
+      code: "UNSUPPORTED_DOCUMENT_TYPE",
     });
 
     expect(parse).not.toHaveBeenCalled();

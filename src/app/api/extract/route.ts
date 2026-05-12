@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { ExtractionError, extractInvoiceData } from "@/lib/extraction";
-import { ExtractInvoiceRequestSchema } from "@/lib/schemas";
+import {
+  ExtractionError,
+  extraireDonneesDevisFournisseur,
+} from "@/lib/extraction";
+import { RequeteExtractionDevisSchema } from "@/lib/schemas";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { ocrText } = ExtractInvoiceRequestSchema.parse(body);
-    const invoice = await extractInvoiceData(ocrText);
+    const corps = await request.json();
+    const { texteOcr } = RequeteExtractionDevisSchema.parse(corps);
+    const devis = await extraireDonneesDevisFournisseur(texteOcr);
 
-    return NextResponse.json({ invoice });
+    return NextResponse.json({ devis });
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(

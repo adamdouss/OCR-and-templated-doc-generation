@@ -1,7 +1,7 @@
 export default function Home() {
   const backlog = [
     "Configurer les routes API OCR, extraction et generation DOCX",
-    "Definir le schema facture avec Zod",
+    "Definir le schema devis fournisseur avec Zod",
     "Brancher le SDK officiel Mistral cote serveur",
     "Ajouter la previsualisation editable des donnees extraites",
   ];
@@ -15,7 +15,7 @@ export default function Home() {
           </span>
           <div className="space-y-4">
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              OCR-to-Report pour factures fournisseurs
+              OCR-to-Report pour devis fournisseurs
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted">
               Le socle technique est pret. La prochaine etape est de brancher le
@@ -83,8 +83,8 @@ export default function Home() {
           <p className="text-sm font-medium text-muted">Generation DOCX</p>
           <h2 className="mt-3 text-xl font-semibold">JSON vers livrable</h2>
           <p className="mt-3 text-sm leading-7 text-muted">
-            Template Word simple, injection des champs facture et telechargement
-            du rapport final depuis le navigateur.
+            Template Word simple, injection des champs devis et telechargement
+            du bon de commande final depuis le navigateur.
           </p>
         </article>
       </section>

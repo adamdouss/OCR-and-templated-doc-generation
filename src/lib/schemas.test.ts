@@ -1,38 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { InvoiceSchema } from "@/lib/schemas";
+import { DevisFournisseurSchema } from "@/lib/schemas";
 
-describe("InvoiceSchema", () => {
-  it("accepts valid invoice data", () => {
-    const result = InvoiceSchema.safeParse({
-      supplierName: "ACME Fournitures",
-      invoiceNumber: "FAC-2026-001",
-      invoiceDate: "2026-05-10",
-      dueDate: "2026-06-10",
-      totalHT: 100,
-      totalTTC: 120,
-      currency: "EUR",
-      lineItems: [
+describe("DevisFournisseurSchema", () => {
+  it("accepte un devis fournisseur valide", () => {
+    const resultat = DevisFournisseurSchema.safeParse({
+      nomFournisseur: "ACME Fournitures",
+      nomClient: "Concordia",
+      numeroDevis: "DEV-2026-001",
+      dateDevis: "2026-05-10",
+      validiteDevis: "30 jours",
+      montantTotalHT: 100,
+      montantTotalTTC: 120,
+      devise: "EUR",
+      lignes: [
         {
           description: "Papier A4",
-          quantity: 10,
-          unitPrice: 10,
-          total: 100,
+          quantite: 10,
+          prixUnitaire: 10,
+          totalLigne: 100,
         },
       ],
-      summary: "Fournitures de bureau.",
+      resume: "Fournitures de bureau.",
     });
 
-    expect(result.success).toBe(true);
+    expect(resultat.success).toBe(true);
   });
 
-  it("rejects invalid invoice data", () => {
-    const result = InvoiceSchema.safeParse({
-      supplierName: "",
-      totalHT: "100",
-      lineItems: [{ description: "" }],
+  it("rejette un devis fournisseur invalide", () => {
+    const resultat = DevisFournisseurSchema.safeParse({
+      nomFournisseur: "",
+      montantTotalHT: "100",
+      lignes: [{ description: "" }],
     });
 
-    expect(result.success).toBe(false);
+    expect(resultat.success).toBe(false);
   });
 });

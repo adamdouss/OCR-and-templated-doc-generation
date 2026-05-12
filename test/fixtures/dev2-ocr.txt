@@ -1,0 +1,52 @@
+DEVIS
+
+Devis n°12345
+
+^{}[]
+
+Date du devis : 06/01/25
+
+Validité du devis : 1 mois
+
+# CÉLIA NAUDIN
+
+123-456-7890
+
+hello@reallygreatsite.com
+
+reallygreatsite.com
+
+123 Anywhere St., Any City
+
+# À L'ATTENTION DE
+
+Concordia
+
+123-456-7890
+
+Anywhere St., Any City
+
+|  DESCRIPTION | PRIX | QUANTITÉ | TOTAL  |
+| --- | --- | --- | --- |
+|  Création de logo | 900 € | 01 | 900 €  |
+|  Conception d'un flyer | 300 € | 01 | 300 €  |
+|  Carte de visite | 300 € | 01 | 300 €  |
+|  Illustration personnalisée | 200 € | 04 | 800 €  |
+
+Sous total : 2 300 €
+
+TVA (20%) : 460 €
+
+TOTAL : 2 760 €
+
+Termes et conditions
+
+Signature suivie de la mention
+
+"bon pour accord"
+
+Le paiement sera dû sous un mois
+
+Un acompte de 25% est requis
+
+MERCI DE VOTRE CONFIANCE
