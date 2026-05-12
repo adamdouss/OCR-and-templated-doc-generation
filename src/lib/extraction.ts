@@ -125,8 +125,7 @@ function normaliserTexteLibre(texte: string | null | undefined): string | null {
     return null;
   }
 
-  return texte
-    .replace(/Acompt(?:é|e)\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
+  return texte.replace(/Acompt\S*\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
     .replace(/\s+%/g, " %")
     .trim();
 }
@@ -140,7 +139,7 @@ function construireResumeDevis(devis: DevisFournisseur): string | null {
   const segments: string[] = [];
 
   if (devis.nomFournisseur) {
-    segments.push(`Devis fournisseur ${devis.nomFournisseur}.`);
+    segments.push(`Devis emis par ${devis.nomFournisseur}.`);
   }
 
   if (devis.lignes.length > 0) {
@@ -150,21 +149,31 @@ function construireResumeDevis(devis: DevisFournisseur): string | null {
       .slice(0, 3);
 
     if (descriptions.length > 0) {
-      segments.push(`Prestations principales : ${descriptions.join(", ")}.`);
+      segments.push(
+        descriptions.length === 1
+          ? `Prestation prevue : ${descriptions[0]}.`
+          : `Prestations prevues : ${descriptions.join(", ")}.`,
+      );
     }
   }
 
   if (devis.montantTotalHT != null && devis.montantTotalTTC != null) {
     segments.push(
-      `Montants extraits : ${devis.montantTotalHT} HT et ${devis.montantTotalTTC} TTC.`,
+      `Montant estime : ${devis.montantTotalHT} HT pour ${devis.montantTotalTTC} TTC.`,
     );
   } else if (devis.montantTotalTTC != null) {
-    segments.push(`Montant total TTC extrait : ${devis.montantTotalTTC}.`);
+    segments.push(`Montant total estime TTC : ${devis.montantTotalTTC}.`);
   }
 
   const conditionsPaiement = normaliserTexteLibre(devis.paymentTerms);
   if (conditionsPaiement) {
-    segments.push(conditionsPaiement.endsWith(".") ? conditionsPaiement : `${conditionsPaiement}.`);
+    segments.push(
+      `Conditions de paiement : ${
+        conditionsPaiement.endsWith(".")
+          ? conditionsPaiement.slice(0, -1)
+          : conditionsPaiement
+      }.`,
+    );
   }
 
   return segments.length > 0 ? segments.join(" ") : null;

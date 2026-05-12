@@ -68,28 +68,28 @@ async function main() {
   <w:body>
     <w:p><w:r><w:t>BON DE COMMANDE</w:t></w:r></w:p>
     <w:p><w:r><w:t xml:space="preserve">Fournisseur : </w:t></w:r><w:r><w:t>+++INS nomFournisseur+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t xml:space="preserve">Client : </w:t></w:r><w:r><w:t>+++INS nomClient != null ? nomClient : ''+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t xml:space="preserve">Référence devis : </w:t></w:r><w:r><w:t>+++INS numeroDevis != null ? numeroDevis : ''+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t xml:space="preserve">Date du devis : </w:t></w:r><w:r><w:t>+++INS dateDevis != null ? dateDevis : ''+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t xml:space="preserve">Validité : </w:t></w:r><w:r><w:t>+++INS validiteDevis != null ? validiteDevis : ''+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t xml:space="preserve">Client : </w:t></w:r><w:r><w:t>+++INS nomClientAffiche+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t xml:space="preserve">Référence devis : </w:t></w:r><w:r><w:t>+++INS numeroDevisAffiche+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t xml:space="preserve">Date du devis : </w:t></w:r><w:r><w:t>+++INS dateDevisAffiche+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t xml:space="preserve">Validité : </w:t></w:r><w:r><w:t>+++INS validiteDevisAffiche+++</w:t></w:r></w:p>
     <w:p><w:r><w:t xml:space="preserve">Total HT : </w:t></w:r><w:r><w:t>+++INS montantTotalHTFormate+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t xml:space="preserve">TVA </w:t></w:r><w:r><w:t>+++INS tauxTvaFormate != '' ? tauxTvaFormate + ' %' : ''+++</w:t></w:r><w:r><w:t xml:space="preserve"> : </w:t></w:r><w:r><w:t>+++INS montantTvaFormate+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t xml:space="preserve">+++INS tvaLibelle+++ : </w:t></w:r><w:r><w:t>+++INS montantTvaFormate+++</w:t></w:r></w:p>
     <w:p><w:r><w:t xml:space="preserve">Total TTC : </w:t></w:r><w:r><w:t>+++INS montantTotalTTCFormate+++</w:t></w:r></w:p>
-    <w:p><w:r><w:t>Resume :</w:t></w:r></w:p>
-    <w:p><w:r><w:t>+++INS resume != null ? resume : ''+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Résumé :</w:t></w:r></w:p>
+    <w:p><w:r><w:t>+++INS resumeAffiche+++</w:t></w:r></w:p>
     <w:p><w:r><w:t>Conditions de paiement :</w:t></w:r></w:p>
-    <w:p><w:r><w:t>+++INS paymentTerms != null ? paymentTerms : ''+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t>+++INS paymentTermsAffiche+++</w:t></w:r></w:p>
     <w:p><w:r><w:t>Contraintes réglementaires :</w:t></w:r></w:p>
-    <w:p><w:r><w:t>+++INS regulatoryNotes != null ? regulatoryNotes : ''+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t>+++INS regulatoryNotesAffiche+++</w:t></w:r></w:p>
     <w:p><w:r><w:t>Garantie :</w:t></w:r></w:p>
-    <w:p><w:r><w:t>+++INS warranty != null ? warranty : ''+++</w:t></w:r></w:p>
+    <w:p><w:r><w:t>+++INS warrantyAffiche+++</w:t></w:r></w:p>
     <w:p><w:r><w:t>Lignes du devis :</w:t></w:r></w:p>
     <w:p><w:r><w:t>+++FOR ligne IN lignes+++</w:t></w:r></w:p>
     <w:p>
       <w:r><w:t xml:space="preserve">- </w:t></w:r>
-      <w:r><w:t>+++INS $ligne.description+++</w:t></w:r>
+      <w:r><w:t>+++INS $ligne.descriptionAffiche+++</w:t></w:r>
       <w:r><w:t xml:space="preserve"> | Quantité : </w:t></w:r>
-      <w:r><w:t>+++INS $ligne.quantite != null ? $ligne.quantite : ''+++</w:t></w:r>
+      <w:r><w:t>+++INS $ligne.quantiteAffiche+++</w:t></w:r>
       <w:r><w:t xml:space="preserve"> | Prix unitaire HT : </w:t></w:r>
       <w:r><w:t>+++INS $ligne.prixUnitaireFormate+++</w:t></w:r>
       <w:r><w:t xml:space="preserve"> | Total HT : </w:t></w:r>

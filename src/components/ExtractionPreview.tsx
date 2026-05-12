@@ -12,6 +12,9 @@ type ExtractionPreviewProps = {
   onChange: (devis: DevisFournisseur) => void;
 };
 
+const GRILLE_LIGNES_DEVIS =
+  "grid min-w-[860px] grid-cols-[minmax(260px,2.1fr)_minmax(110px,0.8fr)_minmax(140px,0.9fr)_minmax(140px,0.9fr)_120px] items-start gap-3";
+
 function convertirVersNombreOptionnel(valeur: string): number | null {
   const valeurNettoyee = valeur.trim().replace(",", ".");
 
@@ -257,16 +260,18 @@ export function ExtractionPreview({
           </button>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-border">
-          <div className="grid grid-cols-[2.1fr_0.8fr_0.9fr_0.9fr_auto] gap-3 bg-surface-strong px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+        <div className="mt-4 overflow-x-auto rounded-[1.25rem] border border-border bg-white">
+          <div
+            className={`${GRILLE_LIGNES_DEVIS} border-b border-border bg-surface-strong px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted`}
+          >
             <span>Description</span>
             <span>Quantite</span>
-            <span>Prix U.</span>
-            <span>Total</span>
+            <span>Prix unitaire HT</span>
+            <span>Total HT</span>
             <span className="text-right">Action</span>
           </div>
 
-          <div className="divide-y divide-border bg-white">
+          <div className="divide-y divide-border">
             {devis.lignes.length === 0 ? (
               <p className="px-4 py-5 text-sm text-muted">
                 Aucune ligne extraite pour le moment.
@@ -275,11 +280,12 @@ export function ExtractionPreview({
               devis.lignes.map((ligne, index) => (
                 <div
                   key={`${ligne.description}-${index}`}
-                  className="grid grid-cols-[2.1fr_0.8fr_0.9fr_0.9fr_auto] gap-3 px-4 py-3"
+                  className={`${GRILLE_LIGNES_DEVIS} px-4 py-3`}
                 >
                   <input
                     className="rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                     disabled={estVerrouille}
+                    placeholder="Description de la ligne"
                     onChange={(event) =>
                       onChange({
                         ...devis,
@@ -295,6 +301,7 @@ export function ExtractionPreview({
                     className="rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                     disabled={estVerrouille}
                     inputMode="decimal"
+                    placeholder="0"
                     onChange={(event) =>
                       onChange({
                         ...devis,
@@ -312,6 +319,7 @@ export function ExtractionPreview({
                     className="rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                     disabled={estVerrouille}
                     inputMode="decimal"
+                    placeholder="0,00"
                     onChange={(event) =>
                       onChange({
                         ...devis,
@@ -329,6 +337,7 @@ export function ExtractionPreview({
                     className="rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                     disabled={estVerrouille}
                     inputMode="decimal"
+                    placeholder="0,00"
                     onChange={(event) =>
                       onChange({
                         ...devis,
@@ -342,21 +351,23 @@ export function ExtractionPreview({
                     }
                     value={ligne.totalLigne?.toString() ?? ""}
                   />
-                  <button
-                    className="justify-self-end rounded-full border border-transparent px-3 py-2 text-sm font-medium text-muted transition hover:border-[#d18b72] hover:text-[#8f3b19] disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={estVerrouille}
-                    onClick={() =>
-                      onChange({
-                        ...devis,
-                        lignes: devis.lignes.filter(
-                          (_, indexCourant) => indexCourant !== index,
-                        ),
-                      })
-                    }
-                    type="button"
-                  >
-                    Retirer
-                  </button>
+                  <div className="flex h-full items-center justify-end">
+                    <button
+                      className="rounded-full border border-[#d9b7a9] bg-[#fff4ee] px-3 py-2 text-sm font-medium text-[#8f3b19] transition hover:border-[#c97955] hover:bg-[#ffe7db] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={estVerrouille}
+                      onClick={() =>
+                        onChange({
+                          ...devis,
+                          lignes: devis.lignes.filter(
+                            (_, indexCourant) => indexCourant !== index,
+                          ),
+                        })
+                      }
+                      type="button"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               ))
             )}

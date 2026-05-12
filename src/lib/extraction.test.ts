@@ -194,9 +194,12 @@ describe("extraireDonneesDevisFournisseur", () => {
       parse,
     });
 
-    expect(devis.resume).toContain("Devis fournisseur ACME Fournitures.");
-    expect(devis.resume).toContain("Prestations principales : Papier A4.");
-    expect(devis.resume).toContain("Montants extraits : 100 HT et 120 TTC.");
+    expect(devis.resume).toContain("Devis emis par ACME Fournitures.");
+    expect(devis.resume).toContain("Prestation prevue : Papier A4.");
+    expect(devis.resume).toContain("Montant estime : 100 HT pour 120 TTC.");
+    expect(devis.resume).toContain(
+      "Conditions de paiement : Acompte de 30 % a la commande.",
+    );
   });
 
   it("rejette un texte OCR vide avant l'appel Mistral", async () => {

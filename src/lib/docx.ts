@@ -15,6 +15,8 @@ const CHEMIN_TEMPLATE_BON_COMMANDE = path.join(
   "purchase-order-template.docx",
 );
 
+const TEXTE_NON_SPECIFIE = "Non spécifié";
+
 type CodeErreurDocx =
   | "INVALID_DATA"
   | "TEMPLATE_NOT_FOUND"
@@ -86,30 +88,67 @@ function normaliserTexteLibre(texte: string | null | undefined): string {
     return "";
   }
 
-  return texte
-    .replace(/Acompt(?:é|e)\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
+  return texte.replace(/Acompt\S*\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
     .replace(/\s+%/g, " %")
     .trim();
 }
 
+function texteOuNonSpecifie(texte: string | null | undefined): string {
+  const texteNormalise = normaliserTexteLibre(texte);
+  return texteNormalise.length > 0 ? texteNormalise : TEXTE_NON_SPECIFIE;
+}
+
+function montantOuNonSpecifie(
+  valeur: number | null | undefined,
+  devise: string,
+): string {
+  return valeur == null ? TEXTE_NON_SPECIFIE : formatCurrency(valeur, devise);
+}
+
 function construireDonneesTemplate(devis: DevisFournisseur) {
   const devise = devis.devise;
+  const lignes =
+    devis.lignes.length > 0
+      ? devis.lignes.map((ligne) => ({
+          ...ligne,
+          descriptionAffiche:
+            ligne.description.trim() || TEXTE_NON_SPECIFIE,
+          quantiteAffiche:
+            ligne.quantite == null ? TEXTE_NON_SPECIFIE : String(ligne.quantite),
+          prixUnitaireFormate: montantOuNonSpecifie(ligne.prixUnitaire, devise),
+          totalLigneFormate: montantOuNonSpecifie(ligne.totalLigne, devise),
+        }))
+      : [
+          {
+            description: "",
+            quantite: null,
+            prixUnitaire: null,
+            totalLigne: null,
+            descriptionAffiche: TEXTE_NON_SPECIFIE,
+            quantiteAffiche: TEXTE_NON_SPECIFIE,
+            prixUnitaireFormate: TEXTE_NON_SPECIFIE,
+            totalLigneFormate: TEXTE_NON_SPECIFIE,
+          },
+        ];
+
+  const tauxTvaFormate = formatPercentage(devis.vatRate);
 
   return {
     ...devis,
-    resume: normaliserTexteLibre(devis.resume),
-    paymentTerms: normaliserTexteLibre(devis.paymentTerms),
-    regulatoryNotes: normaliserTexteLibre(devis.regulatoryNotes),
-    warranty: normaliserTexteLibre(devis.warranty),
-    montantTotalHTFormate: formatCurrency(devis.montantTotalHT, devise),
-    tauxTvaFormate: formatPercentage(devis.vatRate),
-    montantTvaFormate: formatCurrency(devis.vatAmount, devise),
-    montantTotalTTCFormate: formatCurrency(devis.montantTotalTTC, devise),
-    lignes: devis.lignes.map((ligne) => ({
-      ...ligne,
-      prixUnitaireFormate: formatCurrency(ligne.prixUnitaire, devise),
-      totalLigneFormate: formatCurrency(ligne.totalLigne, devise),
-    })),
+    nomClientAffiche: texteOuNonSpecifie(devis.nomClient),
+    numeroDevisAffiche: texteOuNonSpecifie(devis.numeroDevis),
+    dateDevisAffiche: texteOuNonSpecifie(devis.dateDevis),
+    validiteDevisAffiche: texteOuNonSpecifie(devis.validiteDevis),
+    resumeAffiche: texteOuNonSpecifie(devis.resume),
+    paymentTermsAffiche: texteOuNonSpecifie(devis.paymentTerms),
+    regulatoryNotesAffiche: texteOuNonSpecifie(devis.regulatoryNotes),
+    warrantyAffiche: texteOuNonSpecifie(devis.warranty),
+    montantTotalHTFormate: montantOuNonSpecifie(devis.montantTotalHT, devise),
+    tauxTvaFormate,
+    tvaLibelle: tauxTvaFormate ? `TVA ${tauxTvaFormate} %` : "TVA",
+    montantTvaFormate: montantOuNonSpecifie(devis.vatAmount, devise),
+    montantTotalTTCFormate: montantOuNonSpecifie(devis.montantTotalTTC, devise),
+    lignes,
   };
 }
 
