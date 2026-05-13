@@ -1,3 +1,5 @@
+// Thin HTTP wrapper for quote extraction. Request validation happens here,
+// while prompt orchestration and schema parsing stay in src/lib/extraction.ts.
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

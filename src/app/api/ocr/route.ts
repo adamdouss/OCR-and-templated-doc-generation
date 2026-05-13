@@ -1,7 +1,11 @@
+// Thin HTTP wrapper around the OCR service. Validation and Mistral calls live
+// in src/lib/ocr.ts so this route stays easy to reason about.
 import { NextResponse } from "next/server";
 
 import { OcrError, extractTextFromPdf } from "@/lib/ocr";
 
+// request.formData() returns a generic entry, so we narrow it structurally
+// instead of relying on brittle runtime classes across environments.
 function estUnFichierTeleverse(valeur: FormDataEntryValue | null): valeur is File {
   if (!valeur || typeof valeur === "string") {
     return false;

@@ -1,5 +1,7 @@
 import "server-only";
 
+// Lazily creates the shared Mistral SDK client. Keeping this in one place
+// avoids duplicating env handling across OCR and extraction services.
 import { Mistral } from "@mistralai/mistralai";
 
 let mistralClient: Mistral | undefined;

@@ -1,5 +1,7 @@
 import "server-only";
 
+// DOCX generation service: revalidates quote data, maps it to template-friendly
+// display fields, then renders the purchase order document.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -17,6 +19,8 @@ const CHEMIN_TEMPLATE_BON_COMMANDE = path.join(
 
 const TEXTE_NON_SPECIFIE = "Non spécifié";
 
+// DOCX-specific error codes stay separate from OCR/extraction ones because the
+// UI can then explain exactly which stage failed.
 type CodeErreurDocx =
   | "INVALID_DATA"
   | "TEMPLATE_NOT_FOUND"
@@ -44,15 +48,31 @@ export class DocxError extends Error {
   }
 }
 
-function construireNomFichierBonCommande(
-  numeroDevis?: string | null,
-): string {
-  const suffixe = (numeroDevis ?? "sans-reference")
+function nettoyerSegmentNomFichier(valeur: string | null | undefined): string {
+  // This keeps filenames safe on Windows/macOS and avoids leaking accents or
+  // punctuation into the downloaded file.
+  return (valeur ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
     .replace(/[^a-zA-Z0-9-_]+/g, "-")
     .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+}
 
-  return `bon-commande-${suffixe || "sans-reference"}.docx`;
+// The exported filename is intentionally human-readable so users can keep the
+// generated documents without having to rename them manually.
+function construireNomFichierBonCommande(
+  nomClient?: string | null,
+  numeroDevis?: string | null,
+): string {
+  const segments = [
+    nettoyerSegmentNomFichier(nomClient),
+    nettoyerSegmentNomFichier(numeroDevis),
+  ].filter((segment) => segment.length > 0);
+
+  const suffixe = segments.join("-") || "sans-reference";
+  return `bon-commande-${suffixe}.docx`;
 }
 
 async function lireTemplateBonCommande(
@@ -88,11 +108,14 @@ function normaliserTexteLibre(texte: string | null | undefined): string {
     return "";
   }
 
-  return texte.replace(/Acompt\S*\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
+  return texte
+    .replace(/Acompt\S*\s+de\s+(\d+)\s*%/giu, "Acompte de $1 %")
     .replace(/\s+%/g, " %")
     .trim();
 }
 
+// Text fields and numeric fields use different fallbacks because a missing
+// amount should still stay visually distinct from a missing note.
 function texteOuNonSpecifie(texte: string | null | undefined): string {
   const texteNormalise = normaliserTexteLibre(texte);
   return texteNormalise.length > 0 ? texteNormalise : TEXTE_NON_SPECIFIE;
@@ -107,12 +130,13 @@ function montantOuNonSpecifie(
 
 function construireDonneesTemplate(devis: DevisFournisseur) {
   const devise = devis.devise;
+  // Template data is kept separate from raw business data so the DOCX can show
+  // display-friendly fallbacks without mutating the validated quote object.
   const lignes =
     devis.lignes.length > 0
       ? devis.lignes.map((ligne) => ({
           ...ligne,
-          descriptionAffiche:
-            ligne.description.trim() || TEXTE_NON_SPECIFIE,
+          descriptionAffiche: ligne.description.trim() || TEXTE_NON_SPECIFIE,
           quantiteAffiche:
             ligne.quantite == null ? TEXTE_NON_SPECIFIE : String(ligne.quantite),
           prixUnitaireFormate: montantOuNonSpecifie(ligne.prixUnitaire, devise),
@@ -159,6 +183,8 @@ export async function genererBonCommandeDocx(
   let devisValide: DevisFournisseur;
 
   try {
+    // The route already validates the payload, but we revalidate here as a
+    // defensive boundary before touching the Word template.
     devisValide = DevisFournisseurSchema.parse(devis);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -183,7 +209,10 @@ export async function genererBonCommandeDocx(
 
     return {
       buffer: Buffer.from(rapport),
-      nomFichier: construireNomFichierBonCommande(devisValide.numeroDevis),
+      nomFichier: construireNomFichierBonCommande(
+        devisValide.nomClient,
+        devisValide.numeroDevis,
+      ),
     };
   } catch (error) {
     throw new DocxError(

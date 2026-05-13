@@ -1,5 +1,7 @@
 import "server-only";
 
+// Extraction service: takes OCR text, prompts Mistral for a structured quote,
+// validates the JSON with Zod, then normalizes a few business fields.
 import { ZodError } from "zod";
 
 import { getMistralClient } from "@/lib/mistral";
@@ -37,6 +39,23 @@ Extract these structured fields when available:
 - line items
 
 For VAT rate, return only the numeric value, for example 20 for 20%.
+
+Classify quote conditions strictly:
+- paymentTerms must contain only payment conditions such as deposit, balance, due date, payment delay, payment on invoice receipt, or payment schedule.
+- regulatoryNotes must contain only real regulatory constraints such as standards, laws, decrees, mandatory certifications, or legal obligations.
+- warranty must contain only warranty information such as parts warranty, labor warranty, manufacturer warranty, or warranty duration.
+
+Never classify signature or approval instructions as regulatoryNotes.
+Examples of forbidden content in regulatoryNotes:
+- "Signature suivie de la mention bon pour accord"
+- any signature instruction
+- any quote approval or validation instruction
+
+If such a signature or approval instruction appears and no dedicated field exists, do not include it in structured fields.
+You may mention it briefly in the summary if it seems useful.
+
+If no real regulatory constraint is present, return regulatoryNotes as null.
+If no warranty information is present, return warranty as null.
 `.trim();
 
 const MARQUEURS_DEVIS_FOURNISSEUR = [
@@ -90,6 +109,8 @@ type AnalyseurChat = {
   }>;
 };
 
+// Used only for coarse document-type detection before we spend tokens on the
+// extraction model.
 function normaliserTextePourDetection(texte: string): string {
   return texte
     .normalize("NFD")
@@ -97,6 +118,8 @@ function normaliserTextePourDetection(texte: string): string {
     .toLowerCase();
 }
 
+// Mistral can return different message shapes depending on the SDK path used.
+// We only accept plain assistant text here because the next step expects JSON.
 function extraireContenuAssistant(
   reponse: Awaited<ReturnType<AnalyseurChat["parse"]>>,
 ): string {
@@ -120,6 +143,8 @@ export function ressembleAUnDevisFournisseur(texteOcr: string): boolean {
   );
 }
 
+// Shared text cleanup for free-text fields. It smooths OCR/LLM inconsistencies
+// so the UI and the DOCX get a cleaner business wording.
 function normaliserTexteLibre(texte: string | null | undefined): string | null {
   if (!texte) {
     return null;
@@ -136,6 +161,8 @@ function construireResumeDevis(devis: DevisFournisseur): string | null {
     return resumeExistant;
   }
 
+  // The free summary is optional in the prompt, so we generate a short
+  // fallback from the structured fields when the model leaves it empty.
   const segments: string[] = [];
 
   if (devis.nomFournisseur) {
@@ -182,6 +209,8 @@ function construireResumeDevis(devis: DevisFournisseur): string | null {
 function normaliserDevisFournisseur(
   devis: DevisFournisseur,
 ): DevisFournisseur {
+  // This is the last normalization step before the object is returned to the
+  // route/UI. At this point the data is already schema-valid.
   return {
     ...devis,
     resume: construireResumeDevis(devis),
@@ -197,6 +226,8 @@ export function parserDevisFournisseurDepuisMessageChat(
   let chargeUtile: unknown;
 
   try {
+    // We parse manually instead of trusting the SDK output blindly so we can
+    // expose a precise INVALID_JSON error to the API layer.
     chargeUtile = JSON.parse(contenu);
   } catch (error) {
     throw new ExtractionError(
@@ -225,6 +256,13 @@ export async function extraireDonneesDevisFournisseur(
   texteOcr: string,
   analyseur?: AnalyseurChat,
 ): Promise<DevisFournisseur> {
+  // The extraction pipeline is intentionally staged:
+  // 1. validate the OCR text,
+  // 2. reject obvious non-quotes,
+  // 3. call Mistral,
+  // 4. parse JSON,
+  // 5. validate with Zod,
+  // 6. normalize business fields.
   const texteOcrNettoye = texteOcr.trim();
 
   if (!texteOcrNettoye) {
@@ -245,6 +283,8 @@ export async function extraireDonneesDevisFournisseur(
   let reponse: Awaited<ReturnType<AnalyseurChat["parse"]>>;
 
   try {
+    // The prompt already describes the output contract, but we still parse the
+    // returned JSON ourselves to keep runtime guarantees under our control.
     reponse = await analyseurActif.parse({
       model: MODELE_EXTRACTION,
       messages: [

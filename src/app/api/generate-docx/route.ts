@@ -1,3 +1,5 @@
+// HTTP endpoint for DOCX export. The route only validates input and streams
+// the generated file back; template mapping stays in src/lib/docx.ts.
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 

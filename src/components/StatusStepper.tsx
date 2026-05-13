@@ -1,5 +1,7 @@
 "use client";
 
+// Visual representation of the backend pipeline so the user can see where the
+// request currently is: upload, OCR, extraction, review, or DOCX generation.
 export type EtapePipeline =
   | "idle"
   | "uploading"

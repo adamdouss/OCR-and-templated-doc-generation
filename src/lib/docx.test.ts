@@ -31,7 +31,9 @@ describe("genererBonCommandeDocx", () => {
       warranty: "Garantie pieces et main d'oeuvre : 2 ans",
     });
 
-    expect(resultat.nomFichier).toBe("bon-commande-DEV-2026-001.docx");
+    expect(resultat.nomFichier).toBe(
+      "bon-commande-concordia-dev-2026-001.docx",
+    );
     expect(resultat.buffer.length).toBeGreaterThan(0);
     expect(resultat.buffer.subarray(0, 2).toString()).toBe("PK");
   });

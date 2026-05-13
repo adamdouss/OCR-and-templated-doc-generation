@@ -1,5 +1,7 @@
 import "server-only";
 
+// OCR service: validates the uploaded file, sends it to Mistral OCR, and
+// normalizes the response into a single plain-text block for extraction.
 import { Buffer } from "node:buffer";
 
 import type { OCRResponse } from "@mistralai/mistralai/models/components";
@@ -15,6 +17,8 @@ export type FichierPdfTeleverse = {
   type: string;
 };
 
+// OCR errors are explicit because the UI and the API route need to distinguish
+// between user mistakes (missing PDF) and service failures (Mistral error).
 type OcrFailureCode =
   | "MISSING_FILE"
   | "INVALID_FILE_TYPE"
@@ -64,6 +68,8 @@ type OcrClient = {
 };
 
 export function isPdfFile(file: FichierPdfTeleverse): boolean {
+  // MIME type is preferred, but we also keep the extension fallback because
+  // some browsers or test clients do not populate file.type reliably.
   if (file.type === PDF_MIME_TYPE) {
     return true;
   }
@@ -72,6 +78,8 @@ export function isPdfFile(file: FichierPdfTeleverse): boolean {
 }
 
 export function normalizeOcrResponse(response: OCRResponse): string {
+  // Pages are sorted defensively so downstream extraction always receives
+  // deterministic text, even if the SDK response order changes.
   const text = response.pages
     .slice()
     .sort((left, right) => left.index - right.index)
@@ -92,6 +100,7 @@ async function convertFileForMistral(file: FichierPdfTeleverse): Promise<{
   fileName: string;
   content: Uint8Array;
 }> {
+  // Mistral expects binary content, not a browser File object directly.
   const arrayBuffer = await file.arrayBuffer();
 
   return {
@@ -104,6 +113,8 @@ export async function extractTextFromPdf(
   file: FichierPdfTeleverse | null,
   client?: OcrClient,
 ): Promise<string> {
+  // Early validation keeps the API route very small and makes the failure mode
+  // obvious before any network call happens.
   if (!file) {
     throw new OcrError("MISSING_FILE", "Aucun fichier PDF n'a ete fourni.", {
       status: 400,
@@ -125,6 +136,8 @@ export async function extractTextFromPdf(
   let uploadedFileId: string | undefined;
 
   try {
+    // The file is uploaded first, then passed by id to the OCR endpoint.
+    // This mirrors the Mistral SDK flow and keeps the route logic simple.
     const uploadedPayload = await convertFileForMistral(file);
     const uploadedFile = await activeClient.files.upload({
       file: uploadedPayload,

@@ -1,3 +1,5 @@
+// Shared formatting helper so the UI and the generated DOCX present monetary
+// values the same way for French users.
 export function formatCurrency(
   value: number | null | undefined,
   currency = "EUR",

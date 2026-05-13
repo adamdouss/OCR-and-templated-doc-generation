@@ -1,5 +1,7 @@
 "use client";
 
+// Presentational upload block for the single-PDF MVP. It keeps file picking
+// concerns isolated from the page-level workflow state.
 import { useId } from "react";
 
 type UploadZoneProps = {

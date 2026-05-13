@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+// Utility script used to rebuild the baseline DOCX template kept in templates/.
+// The generated file is intentionally simple and uses docx-templates markers.
 const fs = require("node:fs");
 const path = require("node:path");
 

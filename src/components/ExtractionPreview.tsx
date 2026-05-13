@@ -1,5 +1,7 @@
 "use client";
 
+// Editable quote preview. This is intentionally a thin form over the extracted
+// business object so the user can correct data before DOCX export.
 import { formatCurrency } from "@/lib/formatCurrency";
 import type {
   DevisFournisseur,
@@ -31,6 +33,8 @@ function convertirVersTexteOptionnel(valeur: string): string | null {
   return valeurNettoyee ? valeurNettoyee : null;
 }
 
+// Small immutable update helper for line items, so the component can keep the
+// state shape compatible with the Zod schema used on the server.
 function mettreAJourLigne(
   lignes: LigneDevisFournisseur[],
   index: number,

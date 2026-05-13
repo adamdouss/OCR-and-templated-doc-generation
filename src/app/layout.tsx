@@ -1,3 +1,5 @@
+// Root HTML shell for the application. Global metadata, fonts, and top-level
+// document structure are kept here so pages stay focused on product logic.
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";

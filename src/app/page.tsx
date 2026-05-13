@@ -1,5 +1,7 @@
 "use client";
 
+// Main UI orchestrator: upload one PDF, run OCR and extraction, allow edits,
+// then trigger DOCX generation from the validated quote data.
 import { useState } from "react";
 
 import { ExtractionPreview } from "@/components/ExtractionPreview";
@@ -28,6 +30,8 @@ const DEVIS_VIDE: DevisFournisseur = {
   warranty: null,
 };
 
+// Converts any thrown error into a user-facing message without leaking
+// implementation details into the UI.
 function extraireMessageErreur(
   erreur: unknown,
   messageParDefaut: string,
@@ -39,6 +43,8 @@ function extraireMessageErreur(
   return messageParDefaut;
 }
 
+// Shared fetch helper used by the page-level workflow. It centralizes API
+// error handling so each step only deals with its typed payload.
 async function verifierReponseJson<T>(
   reponse: Response,
   messageParDefaut: string,
@@ -61,6 +67,8 @@ async function verifierReponseJson<T>(
 }
 
 export default function Home() {
+  // Page-level state is enough for this MVP because we only handle one file
+  // and one quote at a time. A global store would be unnecessary here.
   const [fichierSelectionne, setFichierSelectionne] = useState<File | null>(
     null,
   );
@@ -77,6 +85,8 @@ export default function Home() {
     etape === "generating";
 
   const reinitialiserSorties = () => {
+    // Any file change resets downstream artifacts so the UI never mixes the
+    // OCR/output of one document with another.
     setEtape("idle");
     setErreur(null);
     setTexteOcr("");
@@ -128,6 +138,8 @@ export default function Home() {
       setNomFichierGenere(null);
       setEtape("uploading");
 
+      // OCR and extraction remain two separate HTTP calls on purpose:
+      // it keeps failures visible and each backend step independently testable.
       const formData = new FormData();
       formData.append("file", fichierSelectionne);
 
@@ -153,6 +165,8 @@ export default function Home() {
         devis: DevisFournisseur;
       }>(extractResponse, "L'extraction des donnees a echoue.");
 
+      // We merge against DEVIS_VIDE so optional fields are always present with
+      // a stable shape in the editor, even if the backend omitted some values.
       setDevis({
         ...DEVIS_VIDE,
         ...extractPayload.devis,
@@ -204,6 +218,8 @@ export default function Home() {
         contenuDisposition?.match(/filename="([^"]+)"/)?.[1] ??
         "bon-commande.docx";
 
+      // Browser download is handled client-side so the route can stay focused
+      // on returning a valid DOCX payload with the right headers.
       const url = window.URL.createObjectURL(blob);
       const lien = document.createElement("a");
       lien.href = url;
@@ -227,6 +243,11 @@ export default function Home() {
   };
 
   return (
+    // The page is split into four user-facing blocks:
+    // 1. context/header,
+    // 2. pipeline state,
+    // 3. editable quote data,
+    // 4. OCR raw text and usage hints.
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-8 lg:px-10 lg:py-10">
       <section className="grid gap-6 rounded-[2rem] border border-border bg-surface p-8 shadow-[0_30px_80px_rgba(78,55,33,0.08)] lg:grid-cols-[1.25fr_0.75fr] lg:p-10">
         <div className="space-y-6">
